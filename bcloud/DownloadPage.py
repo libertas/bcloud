@@ -223,6 +223,17 @@ class DownloadPage(Gtk.Box):
         state_col.props.min_width = 100
         state_col.set_sort_column_id(PERCENT_COL)
 
+
+        GObject.threads_init()
+        thread = threading.Thread(target=self.scan_tasks_thread)
+        thread.daemon = True
+        thread.start()
+
+    def scan_tasks_thread(self):
+        while True:
+            self.scan_tasks()
+            time.sleep(1)
+
     def on_page_show(self):
         if Config.GTK_GE_312:
             self.app.window.set_titlebar(self.headerbar)
