@@ -33,6 +33,7 @@ from bcloud.SharePage import SharePage
 from bcloud.SigninDialog import SigninDialog
 from bcloud.TrashPage import TrashPage
 from bcloud.UploadPage import UploadPage
+from bcloud.FileWatcher import WatchFileChange
 
 try:
 # Ubuntu Unity uses appindicator instead of status icon
@@ -69,6 +70,8 @@ class App:
         self.app.connect('startup', self.on_app_startup)
         self.app.connect('activate', self.on_app_activate)
         self.app.connect('shutdown', self.on_app_shutdown)
+
+        self.filewatcher = None
 
     def on_app_startup(self, app):
         GLib.set_application_name(Config.APPNAME)
@@ -159,6 +162,14 @@ class App:
         self.notebook.props.show_tabs = False
         paned.add2(self.notebook)
 
+        # Add accelerator
+        self.accel_group = Gtk.AccelGroup()
+        self.window.add_accel_group(self.accel_group)
+        key, mod = Gtk.accelerator_parse('F5')
+        self.window.connect('activate-default', self.reload_current_page)
+        self.window.add_accelerator('activate-default',
+                self.accel_group, key, mod, Gtk.AccelFlags.VISIBLE)
+
     def on_app_activate(self, app):
         if not self.profile:
             self.show_signin_dialog()
@@ -168,6 +179,9 @@ class App:
 
     def on_app_shutdown(self, app):
         '''Dump profile content to disk'''
+
+        if self.filewatcher:
+            self.filewatcher.stop()
         if self.profile:
             self.upload_page.on_destroy()
             self.download_page.on_destroy()
@@ -346,6 +360,16 @@ class App:
         append_page(self.upload_page)
 
         self.notebook.show_all()
+
+        self.init_filewatcher()
+
+    def init_filewatcher(self):
+        enable_sync = self.profile['enable-sync']
+        if enable_sync:
+            sync_dir = self.profile['sync-dir']
+            #self.filewatcher = WatchFileChange(sync_dir, self.upload_page.add_bg_task)
+            self.filewatcher = WatchFileChange(sync_dir, self)
+            self.filewatcher.start()
 
     def reload_current_page(self, *args, **kwds):
         '''重新载入当前页面.
